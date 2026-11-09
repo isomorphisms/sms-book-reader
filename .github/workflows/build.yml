@@ -1,0 +1,36 @@
+name: Go mock reader (host and Android)
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'ndk;27.2.12479018'
+      - name: Build host and paired Android runtime binaries
+        run: |
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p dist
+          CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o dist/sms-book-reader-linux-amd64 .
+          CC="$NDK/armv7a-linux-androideabi21-clang" GOOS=android GOARCH=arm GOARM=7 CGO_ENABLED=1 go build -trimpath -ldflags='-s -w' -o dist/sms-book-reader-android-armv7 .
+          CC="$NDK/aarch64-linux-android21-clang" GOOS=android GOARCH=arm64 CGO_ENABLED=1 go build -trimpath -ldflags='-s -w' -o dist/sms-book-reader-android-arm64 .
+          (cd dist && sha256sum * > SHA256SUMS)
+          ./dist/sms-book-reader-linux-amd64 seed
+          ./dist/sms-book-reader-linux-amd64 jog ada continue
+        env:
+          SMS_READER_HOME: ${{ runner.temp }}/sms-mock-readers
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sms-book-reader-go-binaries
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
