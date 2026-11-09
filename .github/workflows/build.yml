@@ -14,11 +14,19 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test ./...
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager 'ndk;27.2.12479018'
       - name: Build host and paired Android runtime binaries
         run: |
-          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          NDK_ROOT="${ANDROID_NDK_HOME:-}"
+          if [ ! -x "$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang" ]; then
+            NDK_ROOT="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          fi
+          if [ ! -x "$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/sdkmanager' | sort -V | tail -1)"
+            yes | "$SDKMANAGER" 'ndk;27.2.12479018'
+            NDK_ROOT="$ANDROID_HOME/ndk/27.2.12479018"
+          fi
+          NDK="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$NDK/aarch64-linux-android21-clang"
           mkdir -p dist
           CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o dist/sms-book-reader-linux-amd64 .
           CC="$NDK/armv7a-linux-androideabi21-clang" GOOS=android GOARCH=arm GOARM=7 CGO_ENABLED=1 go build -trimpath -ldflags='-s -w' -o dist/sms-book-reader-android-armv7 .
