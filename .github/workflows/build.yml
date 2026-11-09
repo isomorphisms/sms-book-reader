@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -42,3 +42,11 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 30
+      - name: Publish checksum-pinned preview binaries
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/go-mock-reader'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat dist/SHA256SUMS
+          gh release create "sms-preview-${GITHUB_SHA}" dist/sms-book-reader-android-armv7 dist/sms-book-reader-android-arm64 dist/sms-book-reader-linux-amd64 dist/SHA256SUMS --target "$GITHUB_SHA" --title "Mock reader ${GITHUB_SHA}" --notes "Mock book passages, no SMS carrier, no physical-device acceptance. Build candidates only." --prerelease
+
